@@ -1,6 +1,6 @@
 {
   "name": "mavity",
-  "version": "2.0.14",
+  "version": "2.0.15",
   "description": "🍎Mavity: GPU compute particle systems and graphs, including Barnes-Hut physics (formerly three-g)",
   "main": "index.js",
   "type": "module",

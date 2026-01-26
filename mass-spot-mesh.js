@@ -14,6 +14,7 @@ import {
 } from 'three';
 
 import { GPUProfiler } from './gravity/monolithic/utils/gpu-profiler.js';
+import { uniform } from 'three/tsl';
 
 /**
  * Create particle rendering mesh
@@ -411,11 +412,20 @@ function createTextureBasedMesh({ particleCount, positionTexture, colorTexture, 
    * Updates the position and color textures.
    * @param {WebGLTexture | Texture} newPositionTexture 
    * @param {WebGLTexture | Texture} newColorTexture 
+   * @param {any} uniforms
    */
-  function updateTextures(newPositionTexture, newColorTexture) {
+  function updateTextures(newPositionTexture, newColorTexture, uniforms) {
     material.uniforms.u_positionTexture.value = wrapTexture(newPositionTexture);
     if (newColorTexture) {
       material.uniforms.u_colorTexture.value = wrapTexture(newColorTexture);
+    }
+
+    if (uniforms) {
+      for (const key in uniforms) {
+        if (material.uniforms[key]) {
+          material.uniforms[key].value = uniforms[key];
+        }
+      }
     }
   }
 
