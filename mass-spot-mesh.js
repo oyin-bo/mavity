@@ -31,8 +31,8 @@ import { uniform } from 'three/tsl';
  *     size: [number, number]                   // Texture dimensions [width, height]
  *   },
  *   fog?: number | { start?: number, gray?: number }, // Common options
- *   glsl?: { definitions?: string, vertex?: string },
- *   enableProfiling?: boolean, // Enable GPU profiling
+ *   glsl?: { definitions?: string, vertex?: string, uniforms?: Record<string, any> },
+ *   enableProfiling?: boolean,
  *   gl?: WebGL2RenderingContext // Required if enableProfiling is true
  * }} options
  */
@@ -44,13 +44,13 @@ export function massSpotMesh({ spots, textureMode, particleCount, textures, get,
       throw new Error('textureMode requires: particleCount, textures.position, textures.size');
     }
     
-    return createTextureBasedMesh({
-      particleCount,
-      positionTexture: textures.position,
-      colorTexture: textures.color,
-      textureSize: textures.size,
-      fog,
-      glsl,
+  return createTextureBasedMesh({
+    particleCount,
+    positionTexture: textures.position,
+    colorTexture: textures.color,
+    textureSize: textures.size,
+    fog,
+    glsl,
       enableProfiling,
       gl
     });
@@ -265,7 +265,7 @@ function createArrayBasedMesh({ spots, get, fog, glsl, enableProfiling, gl }) {
  *  colorTexture: WebGLTexture | Texture,
  *  textureSize: [number, number],
  *  fog?: number | { start?: number, gray?: number },
- *  glsl?: { definitions?: string, vertex?: string },
+ *  glsl?: { definitions?: string, vertex?: string, uniforms?: Record<string, any> },
  *  enableProfiling?: boolean,
  *  gl?: WebGL2RenderingContext
  * }} _
@@ -275,7 +275,7 @@ function createTextureBasedMesh({ particleCount, positionTexture, colorTexture, 
   let geometry = new InstancedBufferGeometry();
   geometry.setAttribute('position', new Float32BufferAttribute(dummyPositions, 3));
   geometry.instanceCount = particleCount;
-  
+
   let fogStart = 0.6, fogGray = 1.0;
   if (typeof fog === 'number') {
     fogStart = fog;
@@ -284,7 +284,7 @@ function createTextureBasedMesh({ particleCount, positionTexture, colorTexture, 
     if (fog.start) fogStart = fog.start;
     if (fog.gray) fogGray = fog.gray;
   }
-  
+
   // Wrap raw WebGLTexture in THREE.ExternalTexture
   /**
    * Wraps a raw WebGLTexture or THREE.Texture for use in the shader.
@@ -297,14 +297,20 @@ function createTextureBasedMesh({ particleCount, positionTexture, colorTexture, 
     // Wrap raw WebGLTexture in ExternalTexture for zero-copy GPU pipeline
     return new ExternalTexture(tex);
   };
-  
+
   const material = new ShaderMaterial({
     uniforms: {
       fogStart: { value: fogStart },
       fogGray: { value: fogGray },
       u_positionTexture: { value: wrapTexture(positionTexture) },
       u_colorTexture: { value: wrapTexture(colorTexture) },
-      u_texSize: { value: new Vector2(textureSize[0], textureSize[1]) }
+      u_texSize: { value: new Vector2(textureSize[0], textureSize[1]) },
+      ...(
+        !glsl?.uniforms ? {} :
+          Object.fromEntries(
+            Object.entries(glsl.uniforms)
+              .map(([k, v]) => [k, v.value ? v : { value: v }]))
+      )
     },
     blending: AdditiveBlending,
     vertexShader: (glsl?.definitions || '') + /* glsl */`
@@ -380,7 +386,7 @@ function createTextureBasedMesh({ particleCount, positionTexture, colorTexture, 
     transparent: true,
     depthWrite: false
   });
-  
+
   const mesh = new Points(geometry, material);
   
   // GPU Profiler (created only if enabled)
@@ -400,7 +406,7 @@ function createTextureBasedMesh({ particleCount, positionTexture, colorTexture, 
       profiler.end();
     };
   }
-  
+
   // Return wrapper object instead of polluting Three.js Points
   return {
     mesh,
@@ -412,7 +418,7 @@ function createTextureBasedMesh({ particleCount, positionTexture, colorTexture, 
    * Updates the position and color textures.
    * @param {WebGLTexture | Texture} newPositionTexture 
    * @param {WebGLTexture | Texture} newColorTexture 
-   * @param {any} uniforms
+   * @param {Record<string, any>} [uniforms]
    */
   function updateTextures(newPositionTexture, newColorTexture, uniforms) {
     material.uniforms.u_positionTexture.value = wrapTexture(newPositionTexture);
