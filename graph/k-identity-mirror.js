@@ -1,6 +1,7 @@
 // @ts-check
 
 import { createProgramSafe } from './utils.js';
+import { formatNumber } from '../gravity/diag.js';
 
 /**
  * KIdentityMirror Kernel
@@ -26,6 +27,8 @@ export class KIdentityMirror {
     this.particleCount = particleCount;
     this.textureWidth = textureWidth;
     this.textureHeight = textureHeight;
+
+    this.renderCount = 0;
 
     this.vaoEmpty = gl.createVertexArray(); // Used for vertex-pulling kernels to avoid poisoning state
     gl.bindVertexArray(null);
@@ -101,6 +104,25 @@ void main() {
 
     this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
     this.gl.useProgram(null);
+
+    this.renderCount++;
+  }
+
+  /**
+   * @param {{ pixels?: boolean }} [options]
+   */
+  valueOf({ pixels } = {}) {
+    return {
+      particleCount: this.particleCount,
+      textureWidth: this.textureWidth,
+      textureHeight: this.textureHeight,
+      renderCount: this.renderCount,
+      toString: () => this.toString()
+    };
+  }
+
+  toString() {
+    return `KIdentityMirror(${this.particleCount}) #${this.renderCount}`;
   }
 
   dispose() {

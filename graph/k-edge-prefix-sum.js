@@ -1,5 +1,6 @@
 // @ts-check
 import { createProgramSafe } from './utils.js';
+import { formatNumber } from '../gravity/diag.js';
 
 /**
  * KEdgePrefixSum
@@ -24,6 +25,8 @@ export class KEdgePrefixSum {
     this.width = width;
     this.height = height;
     this.particleCount = particleCount;
+
+    this.renderCount = 0;
 
     // Internal Ping-Pong Textures for the Scan (R32UI)
     // We scan the 'Count' to produce 'Inclusive Sum'
@@ -389,6 +392,25 @@ void main() {
     // Cleanup
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindVertexArray(null);
+
+    this.renderCount++;
+  }
+
+  /**
+   * @param {{ pixels?: boolean }} [options]
+   */
+  valueOf({ pixels } = {}) {
+    return {
+      particleCount: this.particleCount,
+      width: this.width,
+      height: this.height,
+      renderCount: this.renderCount,
+      toString: () => this.toString()
+    };
+  }
+
+  toString() {
+    return `KEdgePrefixSum(${this.particleCount}) #${this.renderCount}`;
   }
 
   dispose() {

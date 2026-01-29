@@ -1,5 +1,6 @@
 // @ts-check
 import { createProgramSafe } from './utils.js';
+import { formatNumber } from '../gravity/diag.js';
 
 /**
  * KEdgeRelocation
@@ -54,6 +55,9 @@ export class KEdgeRelocation {
     this.encodedSortOrderWidth = encodedSortOrderWidth;
     this.stride = startStride || 128;
     this.edgeCount = edgeCount;
+    this.particleCount = particleCount;
+
+    this.renderCount = 0;
 
     this.program = createProgramSafe({
       gl,
@@ -284,6 +288,32 @@ void main() {
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindVertexArray(null);
+
+    this.renderCount++;
+  }
+
+  /**
+   * @param {{ pixels?: boolean }} [options]
+   */
+  valueOf({ pixels } = {}) {
+    return {
+      particleCount: this.particleCount,
+      edgeCount: this.edgeCount,
+      stride: this.stride,
+      renderCount: this.renderCount,
+
+      // Metadata for comparison if needed
+      edgeStoreWidth: this.edgeStoreWidth,
+      edgeStoreHeight: this.edgeStoreHeight,
+      coarseWidth: this.coarseWidth,
+      coarseHeight: this.coarseHeight,
+      
+      toString: () => this.toString()
+    };
+  }
+
+  toString() {
+    return `KEdgeRelocation(${this.particleCount}p, ${this.edgeCount}e) #${this.renderCount}`;
   }
 
   dispose() {

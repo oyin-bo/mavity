@@ -9,6 +9,7 @@
  */
 
 import { glValidate, createProgramSafe } from './utils.js';
+import { readLinear, formatNumber } from '../gravity/diag.js';
 
 export class KSortEncoder {
   /**
@@ -37,6 +38,8 @@ export class KSortEncoder {
     this.sortSpanSize = sortSpanSize;
     this.encodedSortOrderWidth = encodedSortOrderWidth;
     this.encodedSortOrderHeight = encodedSortOrderHeight;
+
+    this.renderCount = 0;
 
     this.program = createProgramSafe({
       gl,
@@ -202,6 +205,26 @@ void main() {
     gl.useProgram(null);
 
     this.renderCount++;
+  }
+
+  /**
+   * @param {{ pixels?: boolean }} [options]
+   */
+  valueOf({ pixels } = {}) {
+    return {
+      particleCount: this.particleCount,
+      particleDataWidth: this.particleDataWidth,
+      particleDataHeight: this.particleDataHeight,
+      sortSpanSize: this.sortSpanSize,
+      encodedSortOrderWidth: this.encodedSortOrderWidth,
+      encodedSortOrderHeight: this.encodedSortOrderHeight,
+      renderCount: this.renderCount,
+      toString: () => this.toString()
+    };
+  }
+
+  toString() {
+    return `KSortEncoder(${this.particleCount}) span=${this.sortSpanSize} #${this.renderCount}`;
   }
 
   dispose() {

@@ -8,6 +8,7 @@
  */
 
 import { glValidate, createProgramSafe } from './utils.js';
+import { formatNumber } from '../gravity/diag.js';
 
 export class KPhysicsSentinel {
   /**
@@ -112,6 +113,22 @@ void main() {
     gl.useProgram(null);
 
     this.renderCount++;
+  }
+
+  /**
+   * @param {{ pixels?: boolean }} [options]
+   */
+  valueOf({ pixels } = {}) {
+    return {
+      width: this.width,
+      height: this.height,
+      renderCount: this.renderCount,
+      toString: () => this.toString()
+    };
+  }
+
+  toString() {
+    return `KPhysicsSentinel(${this.width}x${this.height}) #${this.renderCount}`;
   }
 
   dispose() {

@@ -9,6 +9,7 @@
  */
 
 import { glValidate, createProgramSafe } from './utils.js';
+import { readLinear, formatNumber } from '../gravity/diag.js';
 
 export class KPhysicsSimulation {
   /**
@@ -50,6 +51,8 @@ export class KPhysicsSimulation {
     this.G = G || 1.0;
     this.springK = springK || 1.0;
     this.eps = eps || 0.0001;
+
+    this.renderCount = 0;
 
     this.program = createProgramSafe({
       gl,
@@ -353,6 +356,30 @@ void main() {
     gl.useProgram(null);
 
     this.renderCount++;
+  }
+
+  /**
+   * @param {{ pixels?: boolean }} [options]
+   */
+  valueOf({ pixels } = {}) {
+    return {
+      particleCount: this.particleCount,
+      particleDataWidth: this.particleDataWidth,
+      particleDataHeight: this.particleDataHeight,
+      edgeStoreWidth: this.edgeStoreWidth,
+      edgeStoreHeight: this.edgeStoreHeight,
+      gravityWindow: this.gravityWindow,
+      sfcResolution: this.sfcResolution,
+      G: this.G,
+      springK: this.springK,
+      eps: this.eps,
+      renderCount: this.renderCount,
+      toString: () => this.toString()
+    };
+  }
+
+  toString() {
+    return `KPhysicsSimulation(${this.particleCount}) G=${formatNumber(this.G)} window=${this.gravityWindow} #${this.renderCount}`;
   }
 
   dispose() {

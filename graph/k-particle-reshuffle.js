@@ -1,5 +1,6 @@
 // @ts-check
 import { createProgramSafe, glValidate } from './utils.js';
+import { formatNumber } from '../gravity/diag.js';
 
 /**
  * KParticleReshuffle Kernel
@@ -33,6 +34,8 @@ export class KParticleReshuffle {
     this.particleDataHeight = particleDataHeight;
     this.encodedSortOrderWidth = encodedSortOrderWidth;
     this.sortSpanSize = sortSpanSize;
+
+    this.renderCount = 0;
 
     this.program = createProgramSafe({
       gl,
@@ -256,6 +259,25 @@ void main() {
     gl.useProgram(null);
 
     this.renderCount++;
+  }
+
+  /**
+   * @param {{ pixels?: boolean }} [options]
+   */
+  valueOf({ pixels } = {}) {
+    return {
+      particleCount: this.particleCount,
+      particleDataWidth: this.particleDataWidth,
+      particleDataHeight: this.particleDataHeight,
+      encodedSortOrderWidth: this.encodedSortOrderWidth,
+      sortSpanSize: this.sortSpanSize,
+      renderCount: this.renderCount,
+      toString: () => this.toString()
+    };
+  }
+
+  toString() {
+    return `KParticleReshuffle(${this.particleCount}) span=${this.sortSpanSize} #${this.renderCount}`;
   }
 
   dispose() {

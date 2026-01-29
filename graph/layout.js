@@ -1,7 +1,5 @@
 // @ts-check
 
-// @ts-check
-
 import { KEdgeCoarseMap } from './k-edge-coarse-map.js';
 import { KEdgePrefixSum } from './k-edge-prefix-sum.js';
 import { KEdgeRelocation } from './k-edge-relocation.js';
@@ -11,6 +9,7 @@ import { KPhysicsSentinel } from './k-physics-sentinel.js';
 import { KPhysicsSimulation } from './k-physics-simulation.js';
 import { KSortEncoder } from './k-sort-encoder.js';
 import { createTextureR32F, createTextureRGBA32F, createTextureRGBA32UI, glValidate } from './utils.js';
+import { readLinear, formatNumber } from '../gravity/diag.js';
 
 export class GraphLayout {
   /**
@@ -18,6 +17,11 @@ export class GraphLayout {
    *   gl: WebGL2RenderingContext,
    *   particleCount: number,
    *   edgeCount: number,
+   *   texPosition: WebGLTexture,
+   *   texVelocity: WebGLTexture,
+   *   texIdMassTint: WebGLTexture,
+   *   texEdgePtr: WebGLTexture,
+   *   texEdgeStore: WebGLTexture,
    *   edgeCoarseMapStride?: number,
    *   gravityWindow?: number,
    *   dt?: number,
@@ -31,6 +35,11 @@ export class GraphLayout {
     gl,
     particleCount,
     edgeCount,
+    texPosition,
+    texVelocity,
+    texIdMassTint,
+    texEdgePtr,
+    texEdgeStore,
     edgeCoarseMapStride,
     gravityWindow,
     dt,
@@ -44,6 +53,10 @@ export class GraphLayout {
     const ext = gl.getExtension('EXT_color_buffer_float');
     if (!ext)
       console.error('EXT_color_buffer_float not supported. GPGPU writes may fail.');
+
+    if (!texPosition || !texVelocity || !texIdMassTint || !texEdgePtr || !texEdgeStore) {
+      throw new Error('GraphLayout: Missing required textures in constructor');
+    }
 
     this.particleCount = particleCount;
     this.edgeCount = edgeCount;
@@ -73,14 +86,15 @@ export class GraphLayout {
 
     this.currentIdx = 0;
     this.passCounter = 0;
+    this.renderCount = 0;
 
-    // 1. Particle State Textures (Ping-Pong)
-    this.texPositionAndSFC = createTextureRGBA32F({ gl: this.gl, width: this.particleDataWidth, height: this.particleDataHeight });
+    // 1. Particle State Textures
+    this.texPositionAndSFC = texPosition;
     this.texScratchPositionAndSFC = createTextureRGBA32F({ gl: this.gl, width: this.particleDataWidth, height: this.particleDataHeight });
 
-    this.texVelocity = createTextureRGBA32F({ gl: this.gl, width: this.particleDataWidth, height: this.particleDataHeight });
+    this.texVelocity = texVelocity;
     this.texScratchVelocity = createTextureRGBA32F({ gl: this.gl, width: this.particleDataWidth, height: this.particleDataHeight });
-    this.texIdMassTint = createTextureRGBA32F({ gl: this.gl, width: this.particleDataWidth, height: this.particleDataHeight });
+    this.texIdMassTint = texIdMassTint;
     this.texScratchIdMassTint = createTextureRGBA32F({ gl: this.gl, width: this.particleDataWidth, height: this.particleDataHeight });
 
     // 2. Textures
@@ -89,9 +103,9 @@ export class GraphLayout {
       this.texEncodedSortOrder.push(createTextureRGBA32UI({ gl: this.gl, width: this.encodedSortOrderWidth, height: this.encodedSortOrderHeight }));
     }
 
-    this.texEdgePtr = createTextureR32F({ gl: this.gl, width: this.particleDataWidth, height: this.particleDataHeight });
+    this.texEdgePtr = texEdgePtr;
     this.texScratchEdgePtr = createTextureR32F({ gl: this.gl, width: this.particleDataWidth, height: this.particleDataHeight });
-    this.texEdgeStore = createTextureR32F({ gl: this.gl, width: this.edgeStoreWidth, height: this.edgeStoreHeight });
+    this.texEdgeStore = texEdgeStore;
     this.texScratchEdgeStore = createTextureR32F({ gl: this.gl, width: this.edgeStoreWidth, height: this.edgeStoreHeight });
 
     this.texCoarseMap = createTextureR32F({ gl: this.gl, width: this.coarseWidth, height: this.coarseHeight });
@@ -182,27 +196,6 @@ export class GraphLayout {
       textureWidth: this.particleDataWidth, // The identity map (output) is PID-based
       textureHeight: this.particleDataHeight
     });
-
-
-    // CPU-side Ghost Map: PID -> [x, y, z]
-    // We'll store it as a Float32Array where index = PID * 3 (or 4 to align?)
-    // Plan says: "index is the PID and the value is the XYZ"
-    // Let's use stride 4 for alignment/simplicity (XYZW)
-    // Assuming max PID is closely related to particleCount, but PIDs are 30-bit?
-    // "PID Mapping: The CPU maintains a fast lookup (potentially just cutting middle 30 bit of DID) to translate BlueSky DIDs into 32-bit Persistent IDs (PIDs)."
-    // If PIDs are dense and 0-indexed up to particleCount, we can use array.
-    // If PIDs are sparse 30-bit hashes, we need a Map or a very large array (4GB for 1B PIDs).
-    // The plan says: "Float32Array where the index is the PID". This implies dense PIDs or a large array.
-    // For now, let's assume PIDs are managed and mapped to 0..N range or we allocate for Max PID.
-    // But wait, "2.5M daily active accounts".
-    // If we use 30-bit hash as PID, the array size is 2^30 * 16 bytes = 16GB. That's too big.
-    // So there must be a "PID -> Compact Index" mapping or PIDs are assigned sequentially.
-    // "Translate BlueSky DIDs into 32-bit Persistent IDs (PIDs)."
-    // Let's assume for now we use a fixed size buffer based on particleCount, assuming PIDs < particleCount * 2 roughly.
-    // Or just start with particleCount * 4 size.
-    this.cpuGhostMap = new Float32Array(this.particleCount * 4); 
-    this.cpuEdgePtrMap = new Float32Array(this.particleCount); // PID -> EdgePtr
-    this.cpuEdgeStore = new Float32Array(this.edgeCount); // Raw Edge Data
     
     this.frameCounter = 0;
     this._lastDebugTime = Date.now() - 18000; // Force first debug after 2s
@@ -212,82 +205,6 @@ export class GraphLayout {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
     gl.bindVertexArray(null);
-  }
-
-  /**
-   * @param {{
-   *   particles: Float32Array,
-   *   edgePtr: Uint32Array,
-   *   edgeStore: Uint32Array
-   * }} data
-   */
-  seed(data) {
-    const gl = this.gl;
-    glValidate(gl, 'Seed Start');
-
-    // De-interleave data for textures
-    const texelCount = this.particleDataWidth * this.particleDataHeight;
-    const posData = new Float32Array(texelCount * 4);
-    const velData = new Float32Array(texelCount * 4);
-    const idMassTintEdgePtrData = new Float32Array(texelCount * 4);
-
-    for (let i = 0; i < this.particleCount; i++) {
-      const off = i * 12;
-      posData[i * 4 + 0] = data.particles[off + 0];
-      posData[i * 4 + 1] = data.particles[off + 1];
-      posData[i * 4 + 2] = data.particles[off + 2];
-      posData[i * 4 + 3] = 0.0; // empty w channel for position
-
-      velData[i * 4 + 0] = data.particles[off + 4];
-      velData[i * 4 + 1] = data.particles[off + 5];
-      velData[i * 4 + 2] = data.particles[off + 6];
-      velData[i * 4 + 3] = 0.0; // SFC Key (calculated in step)
-
-      idMassTintEdgePtrData[i * 4 + 0] = data.particles[off + 7]; // PID (Persistent)
-      idMassTintEdgePtrData[i * 4 + 1] = data.particles[off + 3]; // Mass (Moved from Pos.w)
-      idMassTintEdgePtrData[i * 4 + 2] = 0.0; // Color/Tint
-      // STORE POINTER (INDEX)
-      idMassTintEdgePtrData[i * 4 + 3] = data.edgePtr[i];
-    }
-
-    // Upload to textures
-    gl.bindTexture(gl.TEXTURE_2D, this.texPositionAndSFC);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, this.particleDataWidth, this.particleDataHeight, gl.RGBA, gl.FLOAT, posData);
-
-    gl.bindTexture(gl.TEXTURE_2D, this.texVelocity);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, this.particleDataWidth, this.particleDataHeight, gl.RGBA, gl.FLOAT, velData);
-
-    gl.bindTexture(gl.TEXTURE_2D, this.texIdMassTint);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, this.particleDataWidth, this.particleDataHeight, gl.RGBA, gl.FLOAT, idMassTintEdgePtrData);
-
-    gl.bindTexture(gl.TEXTURE_2D, this.texEdgePtr);
-    // Upload N+1 entries to include Sentinel
-    const ptrTotal = this.particleCount + 1;
-    const ptrRows = Math.floor(ptrTotal / this.particleDataWidth);
-    const ptrRem = ptrTotal % this.particleDataWidth;
-    const edgePtrFloat = new Float32Array(data.edgePtr);
-    if (ptrRows > 0) {
-      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, this.particleDataWidth, ptrRows, gl.RED, gl.FLOAT, edgePtrFloat);
-    }
-    if (ptrRem > 0) {
-      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, ptrRows, ptrRem, 1, gl.RED, gl.FLOAT, edgePtrFloat, ptrRows * this.particleDataWidth);
-    }
-
-    gl.bindTexture(gl.TEXTURE_2D, this.texEdgeStore);
-    const storeRows = Math.floor(this.edgeCount / this.edgeStoreWidth);
-    const storeRem = this.edgeCount % this.edgeStoreWidth;
-    const edgeStoreFloat = new Float32Array(data.edgeStore);
-    if (storeRows > 0) {
-      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, this.edgeStoreWidth, storeRows, gl.RED, gl.FLOAT, edgeStoreFloat);
-    }
-    if (storeRem > 0) {
-      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, storeRows, storeRem, 1, gl.RED, gl.FLOAT, edgeStoreFloat, storeRows * this.edgeStoreWidth);
-    }
-    glValidate(gl, 'Data Uploads');
-
-    // Initialize identity map (PID -> Physical Slot)
-    this.kIdentity.run({ texIdMassTintEdgePtr: this.texIdMassTint });
-    glValidate(gl, 'KIdentity Run');
   }
 
   run() {
@@ -418,6 +335,8 @@ export class GraphLayout {
     [this.texEdgePtr, this.texScratchEdgePtr] = [this.texScratchEdgePtr, this.texEdgePtr];
 
     this.passCounter++;
+    this.frameCounter++;
+    this.renderCount++;
 
     const detailedEdgeTrace = null;
 
@@ -433,6 +352,100 @@ export class GraphLayout {
     if (prevStencil) this.gl.enable(this.gl.STENCIL_TEST);
 
     this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+  }
+
+  /**
+   * @param {{ pixels?: boolean }} [options]
+   */
+  valueOf({ pixels } = {}) {
+    return {
+      particleCount: this.particleCount,
+      edgeCount: this.edgeCount,
+      particleDataWidth: this.particleDataWidth,
+      particleDataHeight: this.particleDataHeight,
+      edgeStoreWidth: this.edgeStoreWidth,
+      edgeStoreHeight: this.edgeStoreHeight,
+      coarseWidth: this.coarseWidth,
+      coarseHeight: this.coarseHeight,
+      renderCount: this.renderCount,
+      frameCounter: this.frameCounter,
+      passCounter: this.passCounter,
+      dt: this.dt,
+      G: this.G,
+      springK: this.springK,
+      eps: this.eps,
+      gravityWindow: this.gravityWindow,
+      sfcResolution: this.sfcResolution,
+      
+      position: readLinear({
+        gl: this.gl,
+        texture: this.texPositionAndSFC,
+        width: this.particleDataWidth,
+        height: this.particleDataHeight,
+        count: this.particleCount,
+        channels: ['x', 'y', 'z', 'sfc'],
+        pixels
+      }),
+      velocity: readLinear({
+        gl: this.gl,
+        texture: this.texVelocity,
+        width: this.particleDataWidth,
+        height: this.particleDataHeight,
+        count: this.particleCount,
+        channels: ['vx', 'vy', 'vz', 'w'],
+        pixels
+      }),
+      idMassTint: readLinear({
+        gl: this.gl,
+        texture: this.texIdMassTint,
+        width: this.particleDataWidth,
+        height: this.particleDataHeight,
+        count: this.particleCount,
+        channels: ['pid', 'mass', 'tint', 'unused'],
+        pixels
+      }),
+      edgePtr: readLinear({
+        gl: this.gl,
+        texture: this.texEdgePtr,
+        width: this.particleDataWidth,
+        height: this.particleDataHeight,
+        count: this.particleCount + 1,
+        channels: ['offset'],
+        format: 'R32F',
+        pixels
+      }),
+      edgeStore: readLinear({
+        gl: this.gl,
+        texture: this.texEdgeStore,
+        width: this.edgeStoreWidth,
+        height: this.edgeStoreHeight,
+        count: this.edgeCount,
+        channels: ['targetIdx'],
+        format: 'R32F',
+        pixels
+      }),
+
+      kPhysics: this.kPhysics.valueOf?.({ pixels }),
+      kSort: this.kSort.valueOf?.({ pixels }),
+      kParticleReshuffle: this.kParticleReshuffle.valueOf?.({ pixels }),
+      kEdgePrefixSum: this.kEdgePrefixSum.valueOf?.({ pixels }),
+      kEdgeCoarseMap: this.kEdgeCoarseMap.valueOf?.({ pixels }),
+      kEdgeRelocation: this.kEdgeRelocation.valueOf?.({ pixels }),
+      kIdentity: this.kIdentity.valueOf?.({ pixels }),
+
+      toString: () => this.toString()
+    };
+  }
+
+  toString() {
+    const val = this.valueOf({ pixels: false });
+    return `GraphLayout(${this.particleCount} particles, ${this.edgeCount} edges) #${this.renderCount}
+  dt=${formatNumber(this.dt)} G=${formatNumber(this.G)} springK=${formatNumber(this.springK)}
+  pos: ${val.position}
+  vel: ${val.velocity}
+  idMass: ${val.idMassTint}
+  edgePtr: ${val.edgePtr}
+  edgeStore: ${val.edgeStore}`;
   }
 
   dispose() {

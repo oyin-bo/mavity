@@ -1,5 +1,6 @@
 // @ts-check
 import { createProgramSafe } from './utils.js';
+import { formatNumber } from '../gravity/diag.js';
 
 /**
  * KEdgeCoarseMap
@@ -35,6 +36,8 @@ export class KEdgeCoarseMap {
     this.particleDataHeight = particleDataHeight;
     this.stride = edgeCoarseMapStride;
     this.particleCount = particleCount;
+
+    this.renderCount = 0;
 
     this.program = createProgramSafe({
       gl,
@@ -92,6 +95,28 @@ export class KEdgeCoarseMap {
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindVertexArray(null);
+
+    this.renderCount++;
+  }
+
+  /**
+   * @param {{ pixels?: boolean }} [options]
+   */
+  valueOf({ pixels } = {}) {
+    return {
+      particleCount: this.particleCount,
+      coarseWidth: this.coarseWidth,
+      coarseHeight: this.coarseHeight,
+      particleDataWidth: this.particleDataWidth,
+      particleDataHeight: this.particleDataHeight,
+      stride: this.stride,
+      renderCount: this.renderCount,
+      toString: () => this.toString()
+    };
+  }
+
+  toString() {
+    return `KEdgeCoarseMap(${this.particleCount}) stride=${this.stride} #${this.renderCount}`;
   }
 
   dispose() {
