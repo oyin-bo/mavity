@@ -14,7 +14,6 @@ import {
 } from 'three';
 
 import { GPUProfiler } from './gravity/monolithic/utils/gpu-profiler.js';
-import { uniform } from 'three/tsl';
 
 /**
  * Create particle rendering mesh
