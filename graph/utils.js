@@ -124,3 +124,31 @@ export function createTextureRGBA32UI({ gl, width, height }) {
   return t;
 }
 
+/**
+ * @param {{
+ *  gl: WebGL2RenderingContext,
+ *  texture: WebGLTexture,
+ *  width: number,
+ *  height: number,
+ *  data: Float32Array
+ * }} _
+ */
+export function writeTextureRGBA32F({ gl, texture, width, height, data }) {
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, gl.RGBA, gl.FLOAT, data);
+}
+
+/**
+ * @param {{
+ *  gl: WebGL2RenderingContext,
+ *  texture: WebGLTexture,
+ *  width: number,
+ *  height: number,
+ *  data: Float32Array
+ * }} _
+ */
+export function writeTextureR32F({ gl, texture, width, height, data }) {
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, gl.RED, gl.FLOAT, data);
+}
+

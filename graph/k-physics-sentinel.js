@@ -22,8 +22,8 @@ export class KPhysicsSentinel {
     this.gl = options.gl;
     const gl = this.gl;
 
-    this.width = options.particleDataWidth;
-    this.height = options.particleDataHeight;
+    this.particleDataWidth = options.particleDataWidth;
+    this.particleDataHeight = options.particleDataHeight;
 
     this.program = createProgramSafe({
       gl,
@@ -94,7 +94,7 @@ void main() {
     }
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.outFramebuffer);
-    gl.viewport(0, 0, this.width, this.height);
+    gl.viewport(0, 0, this.particleDataWidth, this.particleDataHeight);
 
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.STENCIL_TEST);
@@ -115,20 +115,17 @@ void main() {
     this.renderCount++;
   }
 
-  /**
-   * @param {{ pixels?: boolean }} [options]
-   */
-  valueOf({ pixels } = {}) {
+  valueOf() {
     return {
-      width: this.width,
-      height: this.height,
+      width: this.particleDataWidth,
+      height: this.particleDataHeight,
       renderCount: this.renderCount,
       toString: () => this.toString()
     };
   }
 
   toString() {
-    return `KPhysicsSentinel(${this.width}x${this.height}) #${this.renderCount}`;
+    return `KPhysicsSentinel(${this.particleDataWidth}x${this.particleDataHeight}) #${this.renderCount}`;
   }
 
   dispose() {

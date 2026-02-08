@@ -27,13 +27,16 @@ test('GraphLayout: basic allocation and single-frame run', async () => {
 
   const particleCount = 10;
   const edgeCount = 20;
+  const particleDataWidth = 4;
+  const particleDataHeight = 4;
+
 
   // Mock textures
-  const texPosition = createTextureRGBA32F({ gl, width: 4, height: 4 });
-  const texVelocity = createTextureRGBA32F({ gl, width: 4, height: 4 });
-  const texIdMassTint = createTextureRGBA32F({ gl, width: 4, height: 4 });
-  const texEdgePtr = createTextureR32F({ gl, width: 4, height: 4 });
-  const texEdgeStore = createTextureR32F({ gl, width: 4, height: 4 });
+  const texPosition = createTextureRGBA32F({ gl, width: particleDataWidth, height: particleDataHeight });
+  const texVelocity = createTextureRGBA32F({ gl, width: particleDataWidth, height: particleDataHeight });
+  const texIdMassTint = createTextureRGBA32F({ gl, width: particleDataWidth, height: particleDataHeight });
+  const texEdgePtr = createTextureR32F({ gl, width: particleDataWidth, height: particleDataHeight });
+  const texEdgeStore = createTextureR32F({ gl, width: particleDataWidth, height: particleDataHeight });
 
   const layout = new GraphLayout({
     gl,

@@ -358,10 +358,7 @@ void main() {
     this.renderCount++;
   }
 
-  /**
-   * @param {{ pixels?: boolean }} [options]
-   */
-  valueOf({ pixels } = {}) {
+  valueOf() {
     return {
       particleCount: this.particleCount,
       particleDataWidth: this.particleDataWidth,
