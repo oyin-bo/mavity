@@ -10,7 +10,7 @@ import { KPhysicsSimulation } from './k-physics-simulation.js';
 import { KSortEncoder } from './k-sort-encoder.js';
 import { createTextureR32F, createTextureRGBA32F, createTextureRGBA32UI, glValidate } from './utils.js';
 import { readLinear, formatNumber } from '../gravity/diag.js';
-
+3
 export class GraphLayout {
   /**
    * @param {{
@@ -52,7 +52,7 @@ export class GraphLayout {
     // Enable Mandatory Extension for rendering to FLOAT textures
     const ext = gl.getExtension('EXT_color_buffer_float');
     if (!ext)
-      console.error('EXT_color_buffer_float not supported. GPGPU writes may fail.');
+      throw new Error('EXT_color_buffer_float not supported. GPGPU writes may fail.');
 
     if (!texPosition || !texVelocity || !texIdMassTint || !texEdgePtr || !texEdgeStore) {
       throw new Error('GraphLayout: Missing required textures in constructor');
@@ -230,13 +230,12 @@ export class GraphLayout {
     const sortOffset = (this.passCounter % 2) * (this.sortSpanSize / 2);
 
     const now = Date.now();
-    const doDebug = (now - this._lastDebugTime >= 20000) && /** @type {*} */(window).LOG_NEXT_FRAME;
-    if (/** @type {*} */(window).LOG_NEXT_FRAME) {
+    const doDebug = (now - this._lastDebugTime >= 20000) && typeof window !== 'undefined' && /** @type {*} */(window).LOG_NEXT_FRAME;
+    if (typeof window !== 'undefined' && /** @type {*} */(window).LOG_NEXT_FRAME) {
       /** @type {*} */(window).LOG_NEXT_FRAME = false;
     }
 
     const before = null;
-
 
     // Sentinel: write sentinel values into the NEXT buffer so we can validate the pipeline
     this.kSentinel.run({

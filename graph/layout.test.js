@@ -3,68 +3,99 @@
 import assert from 'node:assert';
 import { test } from 'node:test';
 
-import { getGL, resetGL, createTestTexture } from '../gravity/test-utils.js';
+
 import { GraphLayout } from './layout.js';
 
-test('GraphLayout: constructor validates missing textures', () => {
-  const gl = getGL();
-  
+import { webGL2 } from 'webgl2';
+import { createTextureR32F, createTextureRGBA32F } from './utils.js';
+
+test('GraphLayout: constructor validates missing textures', async () => {
+  const gl = await getGL();
+
   // @ts-ignore
   assert.throws(() => new GraphLayout({
     gl,
     particleCount: 128,
     edgeCount: 128
   }), /Missing required textures/);
-  
+
   resetGL();
 });
 
 test('GraphLayout: basic allocation and single-frame run', async () => {
-  const gl = getGL();
-  
+  const gl = await getGL();
+
   const particleCount = 10;
   const edgeCount = 20;
 
   // Mock textures
-  const texPos = createTestTexture(gl, 4, 4, new Float32Array(16 * 4));
-  const texVel = createTestTexture(gl, 4, 4, new Float32Array(16 * 4));
-  const texMeta = createTestTexture(gl, 4, 4, new Float32Array(16 * 4));
-  const texPtr = createTestTexture(gl, 4, 4, new Float32Array(16 * 4), 'R32F');
-  const texStore = createTestTexture(gl, 8, 4, new Float32Array(32 * 4), 'R32F');
+  const texPosition = createTextureRGBA32F({ gl, width: 4, height: 4 });
+  const texVelocity = createTextureRGBA32F({ gl, width: 4, height: 4 });
+  const texIdMassTint = createTextureRGBA32F({ gl, width: 4, height: 4 });
+  const texEdgePtr = createTextureR32F({ gl, width: 4, height: 4 });
+  const texEdgeStore = createTextureR32F({ gl, width: 4, height: 4 });
 
   const layout = new GraphLayout({
     gl,
     particleCount,
     edgeCount,
-    texPosition: texPos,
-    texVelocity: texVel,
-    texIdMassTint: texMeta,
-    texEdgePtr: texPtr,
-    texEdgeStore: texStore
+    texPosition,
+    texVelocity,
+    texIdMassTint,
+    texEdgePtr,
+    texEdgeStore
   });
 
-  assert.strictEqual(layout.particleCount, particleCount);
-  assert.strictEqual(layout.edgeCount, edgeCount);
-  assert.strictEqual(layout.renderCount, 0);
+  assert.deepStrictEqual(
+    {
+      particleCount: layout.particleCount,
+      edgeCount: layout.edgeCount,
+      renderCount: layout.renderCount
+    },
+    {
+      particleCount,
+      edgeCount,
+      renderCount: 0
+    });
 
   // Run one frame
   layout.run();
 
-  assert.strictEqual(layout.renderCount, 1);
-  assert.strictEqual(layout.frameCounter, 1);
-  assert.strictEqual(layout.passCounter, 1);
+  assert.deepStrictEqual(
+    {
+      renderCount: layout.renderCount,
+      frameCounter: layout.frameCounter,
+      passCounter: layout.passCounter
+    },
+    {
+      renderCount: 1,
+      frameCounter: 1,
+      passCounter: 1
+    });
 
   // Verify reflection
   const snapshot = layout.valueOf({ pixels: false });
-  assert.strictEqual(snapshot.renderCount, 1);
-  assert.ok(snapshot.position, 'Position snapshot should exist');
-  assert.ok(snapshot.toString().includes('GraphLayout'), 'toString should contain class name');
+  assert.deepStrictEqual(
+    {
+      renderCount: snapshot.renderCount,
+      position: snapshot.position ? 'Position snapshot should exist' : snapshot.position,
+      toString: snapshot.toString().includes('GraphLayout') ? 'toString should contain class name' : snapshot.toString()
+    },
+    {
+      renderCount: 1,
+      position: 'Position snapshot should exist',
+      toString: 'toString should contain class name'
+  });
 
   layout.dispose();
-  gl.deleteTexture(texPos);
-  gl.deleteTexture(texVel);
-  gl.deleteTexture(texMeta);
-  gl.deleteTexture(texPtr);
-  gl.deleteTexture(texStore);
+  // Textures are removed by layout.dispose(); avoid double-delete
   resetGL();
 });
+
+async function getGL() {
+  const gl = await webGL2({ debug: true });
+  return gl;
+}
+
+function resetGL() {
+}
