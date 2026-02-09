@@ -64,9 +64,12 @@ export class GraphLayout {
     this.edgeCoarseMapStride = edgeCoarseMapStride || 128;
     this.gravityWindow = gravityWindow || 16;
     this.dt = dt || 0.016;
-    this.G = G || 0.0001;
-    this.springK = springK || 1.0;
-    this.eps = eps || 0.1;
+    // Keep old layout behavior: default G is negative small (maintains prior repulsive convention),
+    // and apply a damping that reproduces previous implicit kernel damping (0.998 => damping=0.002)
+    this.G = G !== undefined ? G : -0.0001;
+    this.springK = springK !== undefined ? springK : 1.0;
+    this.eps = eps !== undefined ? eps : 0.1;
+    this.damping = 0.002; // reproduces previous implicit damp of ~0.998
     this.sfcResolution = sfcResolution || 64.0;
 
     // Derived constants
@@ -136,7 +139,8 @@ export class GraphLayout {
       sfcResolution: this.sfcResolution,
       G: this.G,
       springK: this.springK,
-      eps: this.eps
+      eps: this.eps,
+      damping: this.damping
     });
 
     this.kSort = new KSortEncoder({
